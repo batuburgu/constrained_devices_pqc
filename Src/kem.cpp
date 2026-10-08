@@ -56,26 +56,28 @@ KEM::Encapsulation KEM::Encapsulate(const std::vector<uint8_t>& publicKey) const
     }
 
     Encapsulation enc{std::vector<uint8_t>(kem_->length_ciphertext), SecretBuffer(kem_->length_shared_secret)};
-    if (OQS_KEM_encaps(kem_.get(), enc.cipherText.data(), enc.plainText.data(), publicKey.data()) != OQS_SUCCESS) {
+    /* Take the sharedKey, encaps it with publicKey and write it to cipher text */
+    if (OQS_KEM_encaps(kem_.get(), enc.cipherText.data(), enc.sharedKey.data(), publicKey.data()) != OQS_SUCCESS) {
         throw std::runtime_error("OQS_KEM_encaps failed");
     }
     return enc;
 }
 
-/* Extracts the secret from the cipher text */
-SecretBuffer KEM::Decapsulate(const std::vector<uint8_t>& cipherText, const SecretBuffer& secretKey) const {
+/* Extracts the sharedKey from the cipher text */
+SecretBuffer KEM::Decapsulate(const std::vector<uint8_t>& cipherText, const SecretBuffer& privateKey) const {
     if (cipherText.size() != kem_->length_ciphertext) {
         throw std::invalid_argument("Decapsulate: wrong ciphertext size");
     }
-    if (secretKey.size() != kem_->length_secret_key) {
+    if (privateKey.size() != kem_->length_secret_key) {
         throw std::invalid_argument("Decapsulate: wrong secret key size");
     }
 
-    SecretBuffer ss(kem_->length_shared_secret);
-    if (OQS_KEM_decaps(kem_.get(), ss.data(), cipherText.data(), secretKey.data()) != OQS_SUCCESS) {
+    SecretBuffer sharedKey(kem_->length_shared_secret);
+    /* Take the cipher text, decaps it with privateKey and write it to sharedKey */
+    if (OQS_KEM_decaps(kem_.get(), sharedKey.data(), cipherText.data(), privateKey.data()) != OQS_SUCCESS) {
         throw std::runtime_error("OQS_KEM_decaps failed");
     }
-    return ss;
+    return sharedKey;
 }
 
 std::string KEM::GetName() const { return kem_->method_name; }

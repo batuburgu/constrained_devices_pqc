@@ -34,7 +34,7 @@ namespace pqc {
             };
             struct Encapsulation {
                 std::vector<uint8_t> cipherText;
-                SecretBuffer plainText;            
+                SecretBuffer sharedKey;            
             };
 
             explicit KEM(const std::string& algorithm);
