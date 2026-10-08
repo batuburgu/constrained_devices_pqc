@@ -2,4 +2,9 @@ build/
 *.o
 *.a
 *.so
-.vscode/
+.vscode/client
+server
+kem_tester
+third_party/
+bin/
+extern/liboqs/build/
