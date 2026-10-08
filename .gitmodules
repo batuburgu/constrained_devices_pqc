@@ -1,0 +1,3 @@
+[submodule "extern/liboqs"]
+	path = extern/liboqs
+	url = https://github.com/open-quantum-safe/liboqs.git
