@@ -1,5 +1,5 @@
-#include "TCProtocol.hpp"
-#include "Packet.hpp"
+#include "tcp.hpp"
+#include "packet.hpp"
 #include <cstring>
 #include <iostream>
 #include <unistd.h>

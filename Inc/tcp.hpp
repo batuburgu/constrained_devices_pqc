@@ -1,5 +1,5 @@
 #pragma once
-#include "IProtocol.hpp"
+#include "ip.hpp"
 
 class TCProtocol : public IProtocol {
 public:

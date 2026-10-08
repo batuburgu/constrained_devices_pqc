@@ -1,6 +1,6 @@
 #pragma once
-#include "PacketTypes.hpp"
-#include "Measurement.hpp"
+#include "packet_types.hpp"
+#include "measurement.hpp"
 
 namespace DefaultConfigs {
     static constexpr Protocol DEFAULT_PROTOCOL          = Protocol::TCP;

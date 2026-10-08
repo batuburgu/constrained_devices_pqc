@@ -1,5 +1,5 @@
 #pragma once
-#include "IProtocol.hpp"
+#include "ip.hpp"
 #include <netinet/in.h>
 
 class UDProtocol : public IProtocol {

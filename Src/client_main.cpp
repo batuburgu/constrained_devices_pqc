@@ -1,4 +1,4 @@
-#include "UserInterface.hpp"
+#include "user_interface.hpp"
 
 int main() {
     UserInterface ui;

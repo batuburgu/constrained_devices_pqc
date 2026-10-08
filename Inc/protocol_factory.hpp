@@ -1,9 +1,9 @@
 #pragma once
 #include <memory>
-#include "IProtocol.hpp"
-#include "TCProtocol.hpp"
-#include "UDProtocol.hpp"
-#include "PacketTypes.hpp"
+#include "ip.hpp"
+#include "tcp.hpp"
+#include "udp.hpp"
+#include "packet_types.hpp"
 
 class ProtocolFactory {
 public:

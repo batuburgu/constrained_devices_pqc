@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "PacketTypes.hpp"
+#include "packet_types.hpp"
 
 // ---------------------------------------------------------------------------
 // EchoServer is the counterpart run on the other machine (e.g. the Pi):

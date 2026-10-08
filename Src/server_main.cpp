@@ -1,5 +1,5 @@
-#include "EchoServer.hpp"
-#include "PacketTypes.hpp"
+#include "echo_server.hpp"
+#include "packet_types.hpp"
 #include <iostream>
 #include <cstdlib>
 

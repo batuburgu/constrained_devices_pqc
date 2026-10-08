@@ -1,6 +1,6 @@
-#include "EchoServer.hpp"
-#include "ProtocolFactory.hpp"
-#include "UDProtocol.hpp"
+#include "echo_server.hpp"
+#include "protocol_factory.hpp"
+#include "udp.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
