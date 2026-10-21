@@ -4,11 +4,28 @@
 #include <string>
 #include <optional>
 
+typedef enum {
+    MT_ECHO,
+    MT_KEM,
+    MT_END
+} MeasurementType_te;
+
+
 struct Sample {
     uint64_t sequenceId;
     size_t   payloadBytes;
     double   rttMs;      // only meaningful if received == true
     bool     received;
+};
+
+struct KEMLog {
+    uint64_t sequenceId;
+    double keyGenTimeMs;
+    double encapsTimeMs;
+    double DecapsTimeMs;
+    double totalTimeMs;
+    double networkTimeMs;
+    bool succesful;
 };
 
 struct Statistics {
@@ -37,21 +54,23 @@ struct Statistics {
 // ---------------------------------------------------------------------------
 class Measurement {
 public:
-    void Reset(size_t expectedSamples);
+    void Reset(size_t expectedSamples, MeasurementType_te measType);
     void MarkStart();
     void MarkEnd();
 
-    void RecordReceived(uint64_t sequenceId, size_t payloadBytes, double rttMs);
-    void RecordLost(uint64_t sequenceId, size_t payloadBytes);
-
+    void Echo_RecordReceived(uint64_t sequenceId, size_t payloadBytes, double rttMs);
+    void Echo_RecordLost(uint64_t sequenceId, size_t payloadBytes);
+    void KEM_RecordReceived(uint64_t sequenceId, double keyGenTime, double encapsTime, double decapsTime, double totalTime, double networkTime);
+    void KEM_RecordLost(uint64_t sequenceId, double keyGenTime);
     Statistics ComputeStatistics() const;
-    const std::vector<Sample>& samples() const { return samples_; }
+    const std::vector<Sample>& samples() const { return echoSamples_; }
 
     void PrintSummary(const std::string& scenarioLabel = "") const;
     bool Export2CSV(const std::string& path) const;
 
 private:
-    std::vector<Sample> samples_;
+    std::vector<Sample> echoSamples_;
+    std::vector<KEMLog> kemSamples_;
     std::optional<uint64_t> startTimeInNs_;
     std::optional<uint64_t> endTimeInNs_;
 

@@ -12,13 +12,23 @@ public:
     void Run(); // main interactive loop; returns when the user chooses to quit
 
 private:
+    struct Steps {
+        bool kem = false;
+        //bool sig = false;
+        bool echo = false;
+    };
+    
     TestConfig CreateConfigFromPrompts() const;
     //void Export2CSV(const Measurement& measurement) const;
 
-    static Protocol     GetProtocolPrompt();
-    static PacketType   GetPacketTypePrompt();
-    static std::string  GetHostPrompt();
-    static uint16_t     GetPortPrompt();
-    static size_t       GetCountPrompt();
-    static uint32_t     GetPPSPrompt();
+    static Protocol    GetProtocolPrompt();
+    static Steps       GetStepsPrompt();
+    static std::string GetKemPrompt();
+    //static std::string GetSigPrompt();
+    static size_t      GetRepetitionsPrompt();
+    static PacketType  GetPacketTypePrompt();
+    static std::string GetHostPrompt();
+    static uint16_t    GetPortPrompt();
+    static size_t      GetCountPrompt();
+    static uint32_t    GetPPSPrompt();
 };

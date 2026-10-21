@@ -1,4 +1,5 @@
 #include "measurement.hpp"
+#include "server.hpp"
 #include <chrono>
 #include <numeric>
 #include <algorithm>
@@ -13,32 +14,47 @@ uint64_t Measurement::GetTimeinNs() {
         .count();
 }
 
-void Measurement::Reset(size_t expectedSamples) {
-    samples_.clear();
-    samples_.reserve(expectedSamples);
-    startTimeInNs_.reset();
-    endTimeInNs_.reset();
+void Measurement::Reset(size_t expectedSamples, MeasurementType_te measType) {
+    if (measType == MT_ECHO) {
+        echoSamples_.clear();
+        echoSamples_.reserve(expectedSamples);
+        startTimeInNs_.reset();
+        endTimeInNs_.reset();
+    }
+    else if (measType == MT_KEM) {
+        kemSamples_.clear();
+        kemSamples_.reserve(expectedSamples);
+        startTimeInNs_.reset();
+        endTimeInNs_.reset();
+    }
 }
 
 void Measurement::MarkStart() { startTimeInNs_ = GetTimeinNs(); }
 void Measurement::MarkEnd() { endTimeInNs_ = GetTimeinNs(); }
 
-void Measurement::RecordReceived(uint64_t sequenceId, size_t payloadBytes, double rttMs) {
-    samples_.push_back(Sample{sequenceId, payloadBytes, rttMs, true});
+void Measurement::Echo_RecordReceived(uint64_t sequenceId, size_t payloadBytes, double rttMs) {
+    echoSamples_.push_back(Sample{sequenceId, payloadBytes, rttMs, true});
 }
 
-void Measurement::RecordLost(uint64_t sequenceId, size_t payloadBytes) {
-    samples_.push_back(Sample{sequenceId, payloadBytes, 0.0, false});
+void Measurement::Echo_RecordLost(uint64_t sequenceId, size_t payloadBytes) {
+    echoSamples_.push_back(Sample{sequenceId, payloadBytes, 0.0, false});
+}
+
+void Measurement::KEM_RecordReceived(uint64_t sequenceId, double keyGenTime, double encapsTime, double decapsTime, double totalTime, double networkTime) {
+    kemSamples_.push_back(KEMLog{sequenceId, keyGenTime, encapsTime, decapsTime, totalTime, networkTime, true});
+}
+void Measurement::KEM_RecordLost(uint64_t sequenceId, double keyGenTime) {
+    kemSamples_.push_back(KEMLog{sequenceId, keyGenTime, 0.0, 0.0, 0.0, 0.0, false});
 }
 
 Statistics Measurement::ComputeStatistics() const {
     Statistics stats;
-    stats.sent = samples_.size();
+    stats.sent = echoSamples_.size();
 
     std::vector<double> rtts;
-    rtts.reserve(samples_.size());
+    rtts.reserve(echoSamples_.size());
 
-    for (const auto& sample : samples_) {
+    for (const auto& sample : echoSamples_) {
         stats.totalBytes += static_cast<double>(sample.payloadBytes);
         if (sample.received) {
             rtts.push_back(sample.rttMs);
@@ -102,7 +118,7 @@ void Measurement::PrintSummary(const std::string& scenarioLabel) const {
     std::ofstream out(path);
     if (!out.is_open()) return false;
     out << "sequence_id,payload_bytes,received,rtt_ms\n";
-    for (const auto& sample : samples_) {
+    for (const auto& sample : echoSamples_) {
         out << sample.sequenceId << ","
             << sample.payloadBytes << ","
             << (sample.received ? 1 : 0) << ","

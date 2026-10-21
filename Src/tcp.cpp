@@ -1,5 +1,5 @@
 #include "tcp.hpp"
-#include "packet.hpp"
+#include "frame.hpp"
 #include <cstring>
 #include <iostream>
 #include <unistd.h>
@@ -25,7 +25,7 @@ bool TCProtocol::StartServer(uint16_t port) {
 
     int opt = 1;
     setsockopt(listenFd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    int kernelQueueSize = 64*1024; // 64 KB'den fazla olursa SMALL 120 ms ustune cikiyor
+    int kernelQueueSize = 64*1024;
     setsockopt(listenFd_, SOL_SOCKET, SO_SNDBUF, &kernelQueueSize, sizeof(kernelQueueSize));
     setsockopt(listenFd_, SOL_SOCKET, SO_RCVBUF, &kernelQueueSize, sizeof(kernelQueueSize));
 
@@ -127,17 +127,17 @@ bool TCProtocol::ReadExact(int fd, void* buf, size_t len, int timeoutMs) {
 bool TCProtocol::Receive(std::vector<uint8_t>& outData, int timeoutMs) {
     if (connFd_ < 0) return false;
 
-    PacketHeader header{};
-    if (!ReadExact(connFd_, &header, sizeof(header), timeoutMs)) return false;
+    uint8_t headerBytes[frame::headerSize];
+    if (!ReadExact(connFd_, headerBytes, sizeof(headerBytes), timeoutMs)) return false;
 
-    constexpr size_t kMaxPayload = 16 * 1024 * 1024; 
-    if (header.payloadSize > kMaxPayload) return false;
+    frame::Header header;
+    
+    if (!frame::ParseHeader(headerBytes, header)) return false;
 
-    outData.resize(sizeof(header) + header.payloadSize);
-    std::memcpy(outData.data(), &header, sizeof(header));
-    if (header.payloadSize > 0) {
-        if (!ReadExact(connFd_, outData.data() + sizeof(header), header.payloadSize, timeoutMs))
-            return false;
+    outData.resize(frame::headerSize + header.length);
+    std::memcpy(outData.data(), headerBytes, frame::headerSize);
+    if (header.length > 0 && !ReadExact(connFd_, outData.data() + frame::headerSize, header.length, timeoutMs)) {
+        return false;
     }
     return true;
 }

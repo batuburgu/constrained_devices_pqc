@@ -1,6 +1,8 @@
-#include "echo_server.hpp"
+#include "server.hpp"
 #include "protocol_factory.hpp"
 #include "udp.hpp"
+#include "frame.hpp"
+#include "kem.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <deque>
@@ -14,10 +16,17 @@ struct Datagram {
     std::vector<uint8_t> data;
 };
 
-EchoServer::EchoServer(Protocol protocol, uint16_t port) : protocol_(protocol), port_(port) {}
+static uint64_t GetTimeinNS() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+        .count();    
+}
 
-void EchoServer::Run() {
+Server::Server(Protocol protocol, uint16_t port) : protocol_(protocol), port_(port) {}
+
+void Server::Run() {
     auto protocol = ProtocolFactory::CreateProtocol(protocol_);
+    frame::Frame incomingFrame;
     if (!protocol->StartServer(port_)) {
         std::cerr << "Failed to start server on port " << port_ << "\n";
         return;
@@ -39,7 +48,7 @@ void EchoServer::Run() {
         std::unique_lock<std::mutex> readMutexHandler(recvEchoMutex, std::defer_lock);
         bool done = false;
         uint64_t count = 0;
-
+        
         // Echo Thread
         std::thread echo([&] {
             std::vector<uint8_t> msg;
@@ -66,13 +75,38 @@ void EchoServer::Run() {
         while (true) {
             std::vector<uint8_t> msg;
             if (!protocol->Receive(msg, /*timeoutMs=*/0)) break;
+            
+            frame::ParsePacket(msg, incomingFrame);
 
-            readMutexHandler.lock();
-            queueNotFull_CV.wait(readMutexHandler, [&] { return queue.size() < tcpQueueSize; });
+            if (incomingFrame.header.type == frame::Type::Echo) {
+                readMutexHandler.lock();
+                queueNotFull_CV.wait(readMutexHandler, [&] { return queue.size() < tcpQueueSize; });
 
-            queue.push_back(std::move(msg));
-            readMutexHandler.unlock();
-            queueNotEmpty_CV.notify_one();
+                queue.push_back(std::move(msg));
+                readMutexHandler.unlock();
+                queueNotEmpty_CV.notify_one();
+            }
+            else if (incomingFrame.header.type == frame::Type::KeyExchangeRequest) {
+                uint8_t algoNameSize = incomingFrame.payload[0];
+                auto algoNameBeginning = incomingFrame.payload.begin();
+                auto keyBegin = algoNameBeginning + static_cast<std::ptrdiff_t>(algoNameSize);
+
+                const std::string kemAlgorithm(algoNameBeginning, keyBegin);
+                const std::vector<uint8_t> publicKey(keyBegin, incomingFrame.payload.end());
+                
+                pqc::KEM kem(kemAlgorithm);
+                const auto encapsStart = GetTimeinNS();
+                auto encapsData = kem.Encapsulate(publicKey);
+                const auto encapsEnd = GetTimeinNS();
+                const auto elapsedEncapsTime = encapsEnd - encapsStart;
+                std::vector<uint8_t> payload = std::move(encapsData.cipherText);
+                std::vector<uint8_t> wireBytes = frame::BuildPacket(frame::Type::KeyExchangeResponse, payload.data(),payload.size(), incomingFrame.header.sequenceId);
+                frame::StampTime(wireBytes, elapsedEncapsTime);
+                if (!protocol->Send(wireBytes)) {
+                    std::cerr <<" Send failed\n";
+                    break;
+                }                
+            }
         }
 
         readMutexHandler.lock();
@@ -121,17 +155,42 @@ void EchoServer::Run() {
             Datagram dg{};
             if (protocol->ReceiveFrom(dg.data, dg.peer, /*timeoutMs=*/0) < 0) continue;
 
-            readMutexHandler.lock();
-            if (queue.size() >= udpQueueSize) {
+            frame::ParsePacket(dg.data, incomingFrame);
+            
+            if(incomingFrame.header.type == frame::Type::Echo) {
+                readMutexHandler.lock();
+                if (queue.size() >= udpQueueSize) {
+                    readMutexHandler.unlock();
+                    ++drops;                          
+                    continue;
+                }
+                bool wasEmpty = queue.empty();
+                queue.push_back(std::move(dg));
                 readMutexHandler.unlock();
-                ++drops;                          
-                continue;
-            }
-            bool wasEmpty = queue.empty();
-            queue.push_back(std::move(dg));
-            readMutexHandler.unlock();
 
-            if (wasEmpty) queueNotEmpty_CV.notify_one();   // only wake the echo thread when needed
+                if (wasEmpty) queueNotEmpty_CV.notify_one();   // only wake the echo thread when needed
+            } 
+            else if (incomingFrame.header.type == frame::Type::KeyExchangeRequest) {
+                uint8_t algoNameSize = incomingFrame.payload[0];
+                auto algoNameBeginning = incomingFrame.payload.begin();
+                auto keyBegin = algoNameBeginning + static_cast<std::ptrdiff_t>(algoNameSize);
+
+                const std::string kemAlgorithm(algoNameBeginning, keyBegin);
+                const std::vector<uint8_t> publicKey(keyBegin, incomingFrame.payload.end());
+                
+                pqc::KEM kem(kemAlgorithm);
+                const auto encapsStart = GetTimeinNS();
+                auto encapsData = kem.Encapsulate(publicKey);
+                const auto encapsEnd = GetTimeinNS();
+                const auto elapsedEncapsTime = encapsEnd - encapsStart;
+                std::vector<uint8_t> payload = std::move(encapsData.cipherText);
+                std::vector<uint8_t> wireBytes = frame::BuildPacket(frame::Type::KeyExchangeResponse, payload.data(),payload.size(), incomingFrame.header.sequenceId);
+                frame::StampTime(wireBytes, elapsedEncapsTime);
+                if (!protocol->SendTo(wireBytes, dg.peer)) {
+                    std::cerr <<" Send failed\n";
+                    break;
+                }                    
+            }
         }
 
         // Not reached while the loop runs forever (Ctrl+C ends the process). For a future stop flag:
@@ -143,10 +202,5 @@ void EchoServer::Run() {
         // std::cout << "Echoed " << count << " packets, dropped " << drops << "\n";
         // protocol->Close();
     }
-
-
-    // Not reached while the loop runs forever (Ctrl+C ends the process), kept for a future stop flag:
-    // { std::lock_guard<std::mutex> lk(queueMutex); done = true; }
-    // queueNotEmpty_CV.notify_one();
-    // echo.join();
+    
 }

@@ -49,7 +49,7 @@ KEM::KeyPair KEM::GenerateKeyPair() const {
     }
     return keyPair;
 }
-/* Produces a cipher text from the plain text with the publicKey provided */
+/* Encapsulates the sharedKey using publicKey */
 KEM::Encapsulation KEM::Encapsulate(const std::vector<uint8_t>& publicKey) const {
     if (publicKey.size() != kem_->length_public_key) {
         throw std::invalid_argument("Encapsulate: wrong public key size");

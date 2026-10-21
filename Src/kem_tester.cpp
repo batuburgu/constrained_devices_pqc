@@ -12,8 +12,8 @@ int main() {
         auto enc = kem.Encapsulate(keyPair.publicKey);                          // sender
         pqc::SecretBuffer ss = kem.Decapsulate(enc.cipherText, keyPair.privateKey);  // receiver
 
-        bool ok = ss.size() == enc.plainText.size() &&
-                  std::memcmp(ss.data(), enc.plainText.data(), ss.size()) == 0;
+        bool ok = ss.size() == enc.sharedKey.size() &&
+                  std::memcmp(ss.data(), enc.sharedKey.data(), ss.size()) == 0;
 
         std::cout << kem.GetName() << "\n"
                   << "  public key:    " << kem.GetPublicKeySize() << " bytes\n"

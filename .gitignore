@@ -2,7 +2,8 @@ build/
 *.o
 *.a
 *.so
-.vscode/client
+.vscode/
+client
 server
 kem_tester
 third_party/

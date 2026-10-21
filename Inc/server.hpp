@@ -3,19 +3,21 @@
 #include "packet_types.hpp"
 
 // ---------------------------------------------------------------------------
-// EchoServer is the counterpart run on the other machine (e.g. the Pi):
+// Server is the counterpart run on the other machine (e.g. the Pi):
 // it accepts/binds on a port for a given protocol and echoes every packet
 // straight back to whoever sent it, so the client side (TestOrchestrator)
 // can measure round-trip latency. It's intentionally "dumb": all the
 // interesting measurement logic lives client-side.
 // ---------------------------------------------------------------------------
+#define ECHO_REQ()                                      ((config_.runEcho.value()) && (!config_.kemAlgorithm.has_value()))
+#define KEM_REQ()                                       ((!config_.runEcho.has_value()) && (config_.kemAlgorithm.has_value()))
 
-#define LOG_PER_PACKET      100000
-#define TCP_QUEUE_SIZE      512
-#define UDP_QUEUE_SIZE      65536
-class EchoServer {
+#define LOG_PER_PACKET                                  100000
+#define TCP_QUEUE_SIZE                                  512
+#define UDP_QUEUE_SIZE                                  65536
+class Server {
 public:
-    EchoServer(Protocol protocol, uint16_t port);
+    Server(Protocol protocol, uint16_t port);
 
     // Blocks forever, echoing packets. Ctrl+C to stop.
     void Run();
